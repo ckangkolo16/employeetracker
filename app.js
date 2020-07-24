@@ -2,8 +2,6 @@ const mysql = require("mysql");
 const inquirer = require("inquirer");
 const util = require("util");
 
-
-
 const connection = mysql.createConnection({
   host: "localhost",
   port: 3306,
@@ -24,7 +22,7 @@ promptUser = () =>
     .prompt([
       {
         type: "list",
-        message: "Which would you like to add?",
+        message: "Which would you like to do?",
         name: "list",
         choices: [
           "View All Employees",
@@ -41,9 +39,9 @@ promptUser = () =>
       },
     ])
     .then((answer) => {
+      console.log(answer);
       const list = answer.list;
-
-      switch (option) {
+      switch (list) {
         case "View All Employees":
           viewEmployees();
           break;
@@ -54,7 +52,7 @@ promptUser = () =>
         case "Add Employee":
           addEmployees();
           break;
-        case "Remove Employees":
+        case "Remove Employee":
           removeEmployees();
           break;
         case "Update Employee Role":
@@ -70,7 +68,7 @@ promptUser = () =>
         case "Remove Department":
           removeDepartment();
           break;
-        case "View Departments":
+        case "View Department":
           viewDepartments();
           break;
 
@@ -83,10 +81,9 @@ promptUser = () =>
 //Array of all employees
 // used to delete employees: update employee roles:
 employeeList = () => {
-  return new Promise((resolve, reject) => {
-    const allEmployees = [];
-    connection.query("SELECT * FROM employee");
-  });
+  return connection.query(
+    'SELECT e.id as value, CONCAT(e.first_name, " ", e.last_name) AS name FROM employee as e'
+  );
 };
 
 //Array of all Managers
@@ -94,16 +91,18 @@ employeeList = () => {
 
 managersList = () => {
   return new Promise((resolve, reject) => {
-    const allManagers = []
-    connection.query('SELECT employee.id, CONCAT(employee.first_name," ", employee.last_name) AS employee, role.title FROM employee RIGHT JOIN role ON employee.role_id = role.id WHERE role.title = "General Manager" OR role.title = "Assistant Manager" OR role.title = "Sales Lead" OR role.title = "HR Specialist"',
+    const allManagers = [];
+    connection.query(
+      'SELECT employee.id, CONCAT(employee.first_name," ", employee.last_name) AS employee, role.title FROM employee RIGHT JOIN role ON employee.role_id = role.id WHERE role.title = "General Manager" OR role.title = "Assistant Manager" OR role.title = "Sales Lead" OR role.title = "HR Specialist"',
       (err, res) => {
         if (err) throw err;
 
-        res.forEach(manager => {
+        res.forEach((manager) => {
           allManagers.push(manager.employee);
           return err ? reject(err) : resolve(allManagers);
         });
-      })
+      }
+    );
   });
 };
 
@@ -121,7 +120,8 @@ employeeIdList = (employee) => {
   return new Promise((resolve, reject) => {
     connection.query(
       "SELECT * FROM employee WHERE CONCAT(first_name,' ', last_name)=?",
-      [employee], async (err, res) => {
+      [employee],
+      async (err, res) => {
         if (err) throw err;
         return err ? reject(err) : resolve(res[0].id);
       }
@@ -133,16 +133,14 @@ employeeIdList = (employee) => {
 roleList = () => {
   return new Promise((resolve, reject) => {
     const allRoles = [];
-    connection.query("SELECT * FROM role",
-      (err, res) => {
-        if (err) throw err;
-        res.forEach(role => {
-          allRoles.push(role.title);
-          return err ? reject(err) : resolve(allRoles);
-        });
+    connection.query("SELECT * FROM role", (err, res) => {
+      if (err) throw err;
+      res.forEach((role) => {
+        allRoles.push(role.title);
+        return err ? reject(err) : resolve(allRoles);
       });
+    });
   });
-
 };
 
 //role IDs. Used to update roles
@@ -161,7 +159,8 @@ roleIdList = (role) => {
 
 // View All Employees logged in table
 viewEmployees = () => {
-  connection.query('SELECT e.id, CONCAT(e.first_name, " ", e.last_name) AS employee, role.title, department.name AS department, salary, CONCAT(m.first_name, " ", m.last_name) AS manager FROM employee e INNER JOIN role ON e.role_id=role.id INNER JOIN department on role.department_id=department.id LEFT JOIN employee m ON m.id = e.manager_id',
+  connection.query(
+    'SELECT e.id, CONCAT(e.first_name, " ", e.last_name) AS employee, role.title, department.name AS department, salary, CONCAT(m.first_name, " ", m.last_name) AS manager FROM employee e INNER JOIN role ON e.role_id=role.id INNER JOIN department on role.department_id=department.id LEFT JOIN employee m ON m.id = e.manager_id',
 
     // may need db and requr db at top
     (err, res) => {
@@ -172,14 +171,11 @@ viewEmployees = () => {
       );
 
       promptUser();
-
-    });
+    }
+  );
 };
 
-
 //View All Employees by department
-
-
 
 //View All Employees by Manager
 //help ???
@@ -190,11 +186,9 @@ viewEmployees = () => {
 //  message: "Please select from List",
 //choices: await managersList
 // name: "managerChoice"
-// }).then(async answer => { 
+// }).then(async answer => {
 
 // })
-
-
 
 // connection.query("Select * FROM department", (err, res) => {
 //   if (err) throw err;
@@ -206,8 +200,6 @@ viewEmployees = () => {
 //  promptUser();
 //  });
 //};
-
-
 
 // Add Employees
 addEmployees = () => {
@@ -255,20 +247,44 @@ addEmployees = () => {
       const lastName = answer.employeeLastName;
       const employeeRole = answer.employeesRole;
       const managerName = answer.employeeManagerQuery;
-      const query = connection.query(
-        "INSERT INTO employee SET ?",
-        {
-          first_name: firstName,
-          last_name: lastName,
-          role_id: employeeRole,
-          manager_id: managerName,
-        },
+      const queryRoleId = connection.query(
+        "SELECT * FROM role WHERE title = ?",
+        employeeRole,
+
         (err, res) => {
           if (err) throw err;
-          console.log(res.affectedRows + "\n Added Employee");
+          console.log(res);
+          const salesId = res[0].id;
+          connection.query(
+            "INSERT INTO employee SET ?",
+            {
+              first_name: firstName,
+              last_name: lastName,
+              role_id: salesId,
+              manager_id: 1,
+            },
+            (err, res) => {
+              if (err) throw err;
+              console.log(res.affectedRows + "\n Added Employee");
+            }
+          );
         }
       );
-      console.log(query.sql);
+
+      // const query = connection.query(
+      //   " INSERT INTO employee SET ?",
+      //   {
+      //     first_name: firstName,
+      //     last_name: lastName,
+      //     role_id: salesId,
+      //     manager_id: managerName,
+      //   },
+      //   (err, res) => {
+      //     if (err) throw err;
+      //     console.log(res.affectedRows + "\n Added Employee");
+      //   }
+      // );
+      // console.log(query.sql);
       console.log(
         "-------------------------------------------------------------------------------------"
       );
@@ -277,6 +293,7 @@ addEmployees = () => {
 
 //remove Employees
 removeEmployees = async () => {
+  console.log("remove employees function test");
   inquirer
     .prompt({
       type: "list",
@@ -285,11 +302,11 @@ removeEmployees = async () => {
       name: "employeeToDelete",
     })
     .then(async (answer) => {
-      console.log("\n deleting employee");
-      const employeeId = await employeeIdList(answer.employeeToDelete);
+      console.log(answer.employeeToDelete);
+
       const query = connection.query(
         "DELETE FROM employee WHERE id=?",
-        [employeeId],
+        answer.employeeToDelete,
         (err, res) => {
           if (err) throw err;
           console.log(res.affectedRows + "\n employee deleted");
@@ -401,7 +418,6 @@ updateEmployeeManager = async () => {
         "-------------------------------------------------------------------------------------"
       );
     });
-
 };
 
 // List of all departments
@@ -465,29 +481,30 @@ addDepartment = () => {
 removeDepartment = async () => {
   inquirer
     .prompt({
-
       type: "list",
       message: "Which department would you like to remove ?",
-      choices: ["Sales", "Engineering", "Finance", "Legal"],
-      name: "departmentToBeDeleted"
-    }
-    )
-    .then(answer => {
-      console.log("Deleting department...");
-      const dept = answer.departmentToBeDeleted;
+      choices: await departmentList(),
+      name: "departmentToBeDeleted",
+    })
+    .then((answer) => {
+      console.log(answer.departmentToBeDeleted);
+
       const query = connection.query(
         "DELETE FROM department WHERE name=?",
-        [dept],
+        answer.departmentToBeDeleted,
         (err, res) => {
           if (err) throw err;
           console.log(res.affectedRows + "\n Department Deleted!");
           promptUser();
-        });
+        }
+      );
       console.log(query.sql);
       console.log(
-        "-------------------------------------------------------------------------------------");
+        "-------------------------------------------------------------------------------------"
+      );
 
       promptUser();
     });
 };
 
+promptUser();
